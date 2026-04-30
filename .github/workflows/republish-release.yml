@@ -122,7 +122,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
+          # Deliberately NOT using `set -o pipefail`. The previous-tag query
+          # below is `git tag | grep | grep | head -1`, and `head -1` closes
+          # the stream early, sending SIGPIPE to upstream greps. With pipefail
+          # that propagates as a non-zero exit and kills the step before it
+          # can fetch the release body — matching the failure we saw on the
+          # first run. The main release.yml's equivalent step also runs
+          # without pipefail; mirror that here.
+          set -eu
           TAG="${{ inputs.tag }}"
           BASE_VERSION_INPUT="${{ inputs.base_version }}"
 
