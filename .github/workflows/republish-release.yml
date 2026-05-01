@@ -182,17 +182,34 @@ jobs:
           # Same shape as release.yml's Discord step: render Markdown ###
           # headings as bold and drop the "Full Changelog" line (we add a
           # labeled "Compare Changes" link below).
+          # Discord caps embed.description at 4096 chars; budget the
+          # release summary at 3000 to leave headroom for the trailing
+          # Compare/Docker/Downloads block. Mirrors release.yml.
           RELEASE_SUMMARY=$(python3 -c "
+          BUDGET = 3000
           lines = open('release_body.md').read().strip().split('\n')
-          out = []
+          rendered = []
           for line in lines:
             if line.startswith('**Full Changelog**'):
               continue
             if line.startswith('### '):
-              out.append('**' + line[4:] + '**')
+              rendered.append('**' + line[4:] + '**')
             elif line.strip():
-              out.append(line)
-          print('\n'.join(out[:20]))
+              rendered.append(line)
+          out = []
+          used = 0
+          truncated = False
+          for line in rendered:
+            cost = len(line) + 1
+            if used + cost > BUDGET:
+              truncated = True
+              break
+            out.append(line)
+            used += cost
+          if truncated:
+            out.append('')
+            out.append('_…release notes truncated for Discord; see the GitHub release for the full changelog._')
+          print('\n'.join(out))
           ")
 
           if [ -n "$PREVIOUS_TAG" ]; then
@@ -222,6 +239,9 @@ jobs:
             --arg ts "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
             '{username: "Sportarr", embeds: [{title: $title, description: $desc, color: 14427686, timestamp: $ts}]}')
 
-          curl -X POST "$WEBHOOK_URL" \
+          # --fail-with-body so a Discord 4xx (e.g. embed too long) becomes
+          # a step failure instead of silently passing — this whole workflow
+          # exists because that masking happened on a previous release.
+          curl --fail-with-body -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD"

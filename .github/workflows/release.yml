@@ -494,17 +494,39 @@ jobs:
           # The Full Changelog line at the bottom of release_notes.md is dropped here
           # because we render it as its own labeled section below for cleaner Discord
           # formatting (a markdown link instead of an inline URL).
+          # Discord caps embed.description at 4096 chars total. The trailing
+          # Compare/Docker/Downloads block this script appends below is
+          # ~600 chars, so cap the release-notes summary at 3000 chars to
+          # leave headroom and avoid the silent {"embeds": ["0"]} 400 that
+          # killed the v4.0.997 notification. Lines are accumulated until
+          # the budget is exhausted; a truncation marker is appended when
+          # content was dropped so the embed still tells the reader to
+          # read the full release notes for the rest.
           RELEASE_SUMMARY=$(python3 -c "
+          BUDGET = 3000
           lines = open('release_notes.md').read().strip().split('\n')
-          out = []
+          rendered = []
           for line in lines:
             if line.startswith('**Full Changelog**'):
               continue  # rendered separately below as a markdown link
             if line.startswith('### '):
-              out.append('**' + line[4:] + '**')
+              rendered.append('**' + line[4:] + '**')
             elif line.strip():
-              out.append(line)
-          print('\n'.join(out[:20]))
+              rendered.append(line)
+          out = []
+          used = 0
+          truncated = False
+          for line in rendered:
+            cost = len(line) + 1  # +1 for the joining newline
+            if used + cost > BUDGET:
+              truncated = True
+              break
+            out.append(line)
+            used += cost
+          if truncated:
+            out.append('')
+            out.append('_…release notes truncated for Discord; see the GitHub release for the full changelog._')
+          print('\n'.join(out))
           ")
 
           # Build the compare-link section. Wording differs slightly between the
@@ -537,7 +559,12 @@ jobs:
             --arg ts "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
             '{username: "Sportarr", embeds: [{title: $title, description: $desc, color: 14427686, timestamp: $ts}]}')
 
-          curl -X POST "$WEBHOOK_URL" \
+          # --fail-with-body makes curl exit non-zero on 4xx/5xx, but still
+          # prints the response so we can see Discord's validation error if
+          # anything else slips past the size budget. Without --fail, a 400
+          # like {"embeds": ["0"]} (description over 4096 chars) just
+          # printed silently and the step was reported as success.
+          curl --fail-with-body -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD"
 
