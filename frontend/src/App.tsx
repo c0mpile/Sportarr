@@ -46,6 +46,7 @@ import DvrRecordingsSettings from './pages/settings/DvrRecordingsSettings';
 import DvrSchedulePage from './pages/iptv/DvrSchedulePage';
 import TvGuidePage from './pages/iptv/TvGuidePage';
 import WatchChannelPage from './pages/iptv/WatchChannelPage';
+import UfcFightPassSettings from './pages/settings/UfcFightPassSettings';
 
 // Hook to cleanup orphaned inert attributes from Headless UI modals
 // This is a failsafe - the primary cleanup happens in modal afterLeave callbacks
@@ -165,6 +166,7 @@ function App() {
             <Route path="settings/ui" element={<UISettings />} />
             <Route path="settings/tags" element={<TagsSettings />} />
             <Route path="settings/development" element={<DevelopmentSettings />} />
+            <Route path="settings/ufc-fightpass" element={<UfcFightPassSettings />} />
 
             {/* System */}
             <Route path="system" element={<Navigate to="/system/status" replace />} />

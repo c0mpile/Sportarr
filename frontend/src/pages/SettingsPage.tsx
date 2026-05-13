@@ -17,6 +17,7 @@ import {
   CloudArrowDownIcon,
   Bars3Icon,
   XMarkIcon,
+  VideoCameraIcon,
 } from '@heroicons/react/24/outline';
 
 // Setting pages
@@ -34,6 +35,7 @@ import GeneralSettings from './settings/GeneralSettings';
 import UISettings from './settings/UISettings';
 import TagsSettings from './settings/TagsSettings';
 import DevelopmentSettings from './settings/DevelopmentSettings';
+import UfcFightPassSettings from './settings/UfcFightPassSettings';
 
 interface SettingsNavItem {
   name: string;
@@ -121,6 +123,12 @@ const settingsNavigation: SettingsNavItem[] = [
     path: '/settings/tags',
     icon: TagIcon,
     description: 'Manage tags for events, profiles, and indexers',
+  },
+  {
+    name: 'UFC Fight Pass',
+    path: '/settings/ufc-fightpass',
+    icon: VideoCameraIcon,
+    description: 'Archive UFC Fight Pass VODs via yt-dlp',
   },
   // Development tab intentionally hidden from navigation
   // Access directly via /settings/development
@@ -235,6 +243,7 @@ export default function SettingsPage() {
             <Route path="/ui" element={<UISettings />} />
             <Route path="/tags" element={<TagsSettings />} />
             <Route path="/development" element={<DevelopmentSettings />} />
+            <Route path="/ufc-fightpass" element={<UfcFightPassSettings />} />
           </Routes>
         </div>
       </div>
