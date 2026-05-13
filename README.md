@@ -323,6 +323,65 @@ The filtered exports respect your channel settings - hidden channels are exclude
 
 This feature is under active development. Feedback and bug reports are welcome!
 
+## UFC Fight Pass Archival
+
+Sportarr can archive UFC Fight Pass VODs directly using [yt-dlp](https://github.com/yt-dlp/yt-dlp).
+
+### How It Works
+
+1. You paste a `https://ufcfightpass.com/video/<id>` URL into the **Quick Download** card in Settings → UFC Fight Pass.
+2. Sportarr authenticates with your Fight Pass credentials, fetches the event title, and launches `yt-dlp` in the background.
+3. Download progress (0–100%) appears in real-time under **Activity → Queue** (Protocol column shows `UFC`).
+4. The finished file is saved at:
+
+```
+/data/media/sports/UFC/{Year}/{Event Name}/{Event Name}.mp4
+```
+
+### Requirements
+
+| Dependency | Version | Notes |
+|---|---|---|
+| `yt-dlp` | ≥ 2024.11.4 | Installed at `/usr/local/bin/yt-dlp` in the official Docker image |
+| `ffmpeg` | any | Already present in the Docker image; used by yt-dlp to merge streams |
+| UFC Fight Pass account | — | Standard or monthly subscription |
+
+### Docker Environment Variables
+
+No new environment variables are required. The existing `PUID`/`PGID`/`TZ` variables control file ownership as usual.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PUID` | `99` | File ownership UID for downloaded files |
+| `PGID` | `100` | File ownership GID |
+| `TZ` | `America/New_York` | Used to derive the `{Year}` folder from the event date |
+
+> **Do not** put Fight Pass credentials in `docker-compose.yml` or environment variables. They are stored securely in `/config/config.xml`, which is admin-only.
+
+### Setup
+
+1. Go to **Settings → UFC Fight Pass**
+2. Enter your Fight Pass **Email** and **Password** and click **Save Settings**
+3. Click **Test Connection** — Sportarr will verify the credentials and cache a session cookie
+4. Paste a Fight Pass video URL into **Quick Download** and click **Start Rip**
+
+### Quality Options
+
+| Label | yt-dlp format |
+|---|---|
+| Best | `bestvideo+bestaudio/best` |
+| 1080p | `bestvideo[height<=1080]+bestaudio/best[height<=1080]` |
+| 720p | `bestvideo[height<=720]+bestaudio/best[height<=720]` |
+| Smallest | `worstvideo+worstaudio/worst` |
+
+### Known Limitations
+
+- Manual URL-paste only (no automatic monitoring of Fight Pass schedules yet)
+- DRM-protected content will fail — yt-dlp's `ufcfightpass` extractor works on non-Widevine HLS streams only
+- The session cookie is cached at `{DataPath}/ufc-cookies.txt`; it expires after roughly 30 days — use **Test Connection** to refresh it
+
+
+
 ## Troubleshooting
 
 **Can't connect to download client in Docker?**

@@ -214,16 +214,19 @@ public sealed class UfcFightPassService : IUfcFightPassService
         {
             try
             {
-                // SIGTERM — let yt-dlp flush the partial file.
-                job.Process.Kill(entireProcessTree: false);
+                // SIGTERM to the entire process group — kills yt-dlp AND spawned ffmpeg.
+                job.Process.Kill(entireProcessTree: true);
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                 await job.Process.WaitForExitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
-                // Escalate to SIGKILL.
-                _logger.LogWarning("[UFC] yt-dlp did not exit after SIGTERM, sending SIGKILL for {DownloadId}", downloadId);
-                try { job.Process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+                // 5 s elapsed and the tree is still alive — nothing more we can do.
+                _logger.LogWarning("[UFC] Process tree still alive after 5 s for {DownloadId}; giving up", downloadId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[UFC] Kill failed for {DownloadId}; process may already be gone", downloadId);
             }
         }
 
@@ -503,11 +506,52 @@ public sealed class UfcFightPassService : IUfcFightPassService
     private string ResolveCookiePath(Config config)
     {
         if (!string.IsNullOrEmpty(config.UfcCookiePath))
-            return config.UfcCookiePath;
+            return EnsureCookieFileAccessible(config.UfcCookiePath);
 
         var dataPath = _configuration["Sportarr:DataPath"]
             ?? Path.Combine(Directory.GetCurrentDirectory(), "data");
-        return Path.Combine(dataPath, "ufc-cookies.txt");
+        return EnsureCookieFileAccessible(Path.Combine(dataPath, "ufc-cookies.txt"));
+    }
+
+    /// <summary>
+    /// Ensures the cookie file path's parent directory exists and that the file
+    /// itself has been created (empty, 0600) so yt-dlp can read/write it under
+    /// the container's app user regardless of PUID/PGID.
+    /// </summary>
+    private string EnsureCookieFileAccessible(string cookiePath)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(cookiePath);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+
+            if (!File.Exists(cookiePath))
+            {
+                // Create an empty file so yt-dlp never encounters a missing-file error.
+                File.WriteAllText(cookiePath, string.Empty);
+                _logger.LogDebug("[UFC] Created empty cookie file at {Path}", cookiePath);
+            }
+
+            // Set 0600 so only the owning process user can read/write it.
+            // On Linux this calls chmod(2) via the File.SetUnixFileMode API (available .NET 7+).
+            // On Windows/macOS the call is a no-op because UnixFileMode is not applicable.
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            {
+                var currentMode = File.GetUnixFileMode(cookiePath);
+                const UnixFileMode target = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+                if (currentMode != target)
+                    File.SetUnixFileMode(cookiePath, target);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Non-fatal: log and continue. yt-dlp will surface any real permission
+            // errors in its own stderr.
+            _logger.LogWarning(ex, "[UFC] Could not ensure cookie file permissions at {Path}", cookiePath);
+        }
+
+        return cookiePath;
     }
 
     /// <summary>
@@ -542,9 +586,25 @@ public sealed class UfcFightPassService : IUfcFightPassService
         if (stderr.Contains("Unable to download webpage", StringComparison.OrdinalIgnoreCase))
             return "Network error — UFC Fight Pass could not be reached.";
 
-        // Truncate to 500 chars to avoid flooding the UI.
-        var raw = stderr.Replace('\n', ' ').Trim();
-        return raw.Length > 500 ? raw[..500] + "…" : raw;
+        // Fall back to the last 2 non-empty lines of stderr so the UI always
+        // shows the actionable yt-dlp error line rather than a truncated blob.
+        return ExtractLastStderrLines(stderr, lines: 2);
+    }
+
+    /// <summary>
+    /// Returns the last <paramref name="lines"/> non-empty lines of stderr as a single string.
+    /// Caps total length at 500 chars.
+    /// </summary>
+    private static string ExtractLastStderrLines(string stderr, int lines = 2)
+    {
+        var relevant = stderr
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .TakeLast(lines)
+            .ToList();
+
+        var msg = string.Join(" | ", relevant);
+        return msg.Length > 500 ? msg[..500] + "…" : msg;
     }
 
     private static bool IsRetriableError(string stderr) =>
