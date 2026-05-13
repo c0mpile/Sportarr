@@ -257,6 +257,10 @@ public static class ServiceCollectionExtensions
         // (~30k rows) in memory across requests.
         services.AddSingleton<IptvOrgSyncService>();
 
+        // UFC Fight Pass archiving (singleton — holds live yt-dlp process table).
+        services.AddSingleton<Sportarr.Api.Services.Interfaces.IUfcFightPassService,
+                              Sportarr.Api.Services.UfcFightPassService>();
+
         return services;
     }
 
