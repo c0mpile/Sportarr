@@ -42,6 +42,8 @@ RUN apt-get update && \
         ca-certificates \
         # FFmpeg with hardware acceleration
         ffmpeg \
+        # Python3 — required runtime for yt-dlp
+        python3 \
         # VAAPI (Video Acceleration API) - works on all architectures
         libva2 \
         libva-drm2 \
@@ -71,6 +73,18 @@ RUN apt-get update && \
     # Cleanup to reduce image size
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# ============================================================================
+# yt-dlp — UFC Fight Pass archiving
+# Install the self-contained release binary (no pip, no venv needed).
+# curl is already present from the block above.
+# ============================================================================
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+        -o /usr/local/bin/yt-dlp && \
+    chmod +x /usr/local/bin/yt-dlp
+
+# Build-time sanity check — fails the build if either binary is missing.
+RUN yt-dlp --version && ffmpeg -version | head -1
 
 # ============================================================================
 # GPU Environment Configuration

@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  sportarr:
+    image: ${DOCKER_USERNAME:-sportarr}/sportarr:${TAG:-latest}
+    container_name: sportarr
+    restart: unless-stopped
+    ports:
+      - "1867:1867"  # Sportarr default port
+    volumes:
+      - ./config:/config
+      - /path/to/your/sports:/data
+    environment:
+      - PUID=99
+      - PGID=100
+      - UMASK=022
+      - TZ=America/New_York
+    # Uncomment to expose a GPU for DVR hardware acceleration (VAAPI):
+    # devices:
+    #   - /dev/dri:/dev/dri

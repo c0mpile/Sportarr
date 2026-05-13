@@ -255,4 +255,57 @@ public class Config
     /// Default HTTP client timeout in seconds
     /// </summary>
     public int HttpClientTimeoutSeconds { get; set; } = 100;
+
+    // =========================================================================
+    // UFC Fight Pass Settings
+    // Credentials are stored plain-text (same as IPTV source credentials).
+    // config.xml is admin-only and must not be committed to version control.
+    // =========================================================================
+
+    /// <summary>Master switch for the UFC Fight Pass integration.</summary>
+    public bool UfcEnabled { get; set; } = false;
+
+    /// <summary>UFC Fight Pass account email address.</summary>
+    public string UfcEmail { get; set; } = "";
+
+    /// <summary>UFC Fight Pass account password (plain-text, admin-only).</summary>
+    public string UfcPassword { get; set; } = "";
+
+    /// <summary>
+    /// yt-dlp format selector. Maps to UI labels:
+    ///   Best     → "bestvideo+bestaudio/best"
+    ///   1080p    → "bestvideo[height&lt;=1080]+bestaudio/best[height&lt;=1080]"
+    ///   720p     → "bestvideo[height&lt;=720]+bestaudio/best[height&lt;=720]"
+    ///   Smallest → "worstvideo+worstaudio/worst"
+    /// </summary>
+    public string UfcQualityFormat { get; set; } = "bestvideo+bestaudio/best";
+
+    /// <summary>--concurrent-fragments value for yt-dlp (default 4).</summary>
+    public int UfcConcurrentFragments { get; set; } = 4;
+
+    /// <summary>
+    /// Root output directory for UFC downloads.
+    /// Empty = "/data/media/sports/UFC" (Docker volume default).
+    /// </summary>
+    public string UfcOutputPath { get; set; } = "";
+
+    /// <summary>
+    /// Path to the yt-dlp binary.
+    /// Empty = auto-discover (/usr/local/bin/yt-dlp then PATH).
+    /// </summary>
+    public string UfcYtDlpPath { get; set; } = "";
+
+    /// <summary>
+    /// Path to the Netscape cookie file for yt-dlp authenticated sessions.
+    /// Empty = auto-managed at {DataPath}/ufc-cookies.txt.
+    /// </summary>
+    public string UfcCookiePath { get; set; } = "";
+
+    // Suppress these from config.xml when at default values to keep the file clean.
+    public bool ShouldSerializeUfcEmail() => !string.IsNullOrEmpty(UfcEmail);
+    public bool ShouldSerializeUfcPassword() => !string.IsNullOrEmpty(UfcPassword);
+    public bool ShouldSerializeUfcQualityFormat() => UfcQualityFormat != "bestvideo+bestaudio/best";
+    public bool ShouldSerializeUfcOutputPath() => !string.IsNullOrEmpty(UfcOutputPath);
+    public bool ShouldSerializeUfcYtDlpPath() => !string.IsNullOrEmpty(UfcYtDlpPath);
+    public bool ShouldSerializeUfcCookiePath() => !string.IsNullOrEmpty(UfcCookiePath);
 }
